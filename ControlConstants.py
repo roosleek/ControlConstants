@@ -1,99 +1,159 @@
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, astuple
+from typing import ClassVar
 import socket
 import struct
-from abc import ABC, abstractmethod
 import xml.etree.ElementTree as ET
 
+class ProtocolABC(ABC):
+    """Абстрактный базовый класс для объектов протокола."""
+    def __post_init__(self):
+        self.to_bytes()
 
-class ControllerABC(ABC):
+    def __bytes__(self):
+        """Преобразовать объект протокола в байты."""
+        return self.to_bytes()
+    
+    def to_bytes(self):
+        """Преобразовать объект протокола в байты с использованием указанного формата и кортежа значений."""
+        return struct.pack(self._format, *astuple(self))
+    
+    @classmethod
+    def from_bytes(cls, binary: bytes):
+        """Создать объект протокола из байтов с использованием указанного формата."""
+        fields = struct.unpack(cls._format, binary)
+        return cls(*fields)
+    
+    @classmethod
+    def size(self):
+        """Получить размер объекта протокола в байтах."""
+        return struct.calcsize(self._format)
+
+
+@dataclass
+class ProtocolCC1(ProtocolABC):
+    header: int   = 0xCCC0  # uint16 | 2 байта
+    address: int  = 0       # uint16 | 2 байта
+    value: int    = 0       # uint64 | 8 байт
+    _format: ClassVar[str] = ">"+"H"+"H"+"Q" 
+
+@dataclass
+class ProtocolCC2(ProtocolABC):
+    header: int    = 0xCC20 # uint16 | 2 байт
+    dev_id: int    = 0      # uint16 | 2 байт
+    timestamp: int = 0      # uint32 | 4 байта
+    counter: int   = 0      # uint16 | 2 байта
+    address: int   = 0      # uint16 | 2 байта
+    value: int     = 0      # uint64 | 8 байта
+    _format: ClassVar[str] = ">"+"H"+"H"+"I"+"H"+"H"+"Q"
+
+
+class TransportABC(ABC):
+    """Абстрактный базовый класс для объектов приемо-передачи пакетов"""
+
     @abstractmethod
-    def write(self):
+    def write(self, address: int, value: int) -> ProtocolABC or None or int:
+        """Записать значение в указанный адрес."""
         pass
 
     @abstractmethod
-    def read(self):
+    def read(self, address: int) -> ProtocolABC:
+        """Считать значение из указанного адреса."""
         pass
 
 
-class ControllerUDP1(ControllerABC):
-    def __init__(self,
-                 interface_ip: str,         # IP-адрес интерфейса, через который происходит общение с ContralConstance
-                 tx_ip: str = "192.168.1.255", # IP-адрес для отправления команд
-                 tx_port: int = 32766,      # Порт для отправления команд
-                 rx_ip: str = "239.1.2.3",  # IP-адрес для получения ответа
-                 rx_port: int = 32767,      # Порт для получения ответа                 
-                 buffer_size: int = 12,     # Размер сообщения (поля data) ContralConstance
-                 timeout: int = 2           # Таймаут ожидания ответа [мс]
+class TransportUDP(TransportABC):
+    def __init__(self, 
+                 protocol_class: ProtocolABC,   # Класс протокола
+                 interface_ip: str,             # IP-адрес интерфейса, через который происходит общение с ControlConstants
+                 buffer_size: int = None,       # Максимальный размер сообщения (поля data в UDP-посылке); если не указан, берется из протокола
+                 tx_ip: str = "192.168.1.255",  # IP-адрес для отправки команд
+                 tx_port: int = 32766,          # Порт для отправки команд
+                 rx_ip: str = "239.1.2.3",      # IP-адрес для получения ответа
+                 rx_port: int = 32767,          # Порт для получения ответа                 
+                 timeout: int = 5,              # Таймаут ожидания ответа [сек]
+                 is_all_groups: bool = True     # 
     ) -> None:
-        
-        self.IS_ALL_GROUPS = True # Под Windows мы не можем забиндиться на адрес multicast-группы (https://habr.com/ru/articles/141021/)
-        
-        self.TX_ADDRESS = (tx_ip, tx_port)
-        self.RX_ADDRESS = (rx_ip, rx_port)
-        self.TIMEOUT = timeout
-        self.BUFFER_SIZE = buffer_size     
+        '''
+        Класс для создания объекта передачи данных через UDP-пакеты.
 
-        if not(interface_ip):
-            interface_ip = socket.gethostbyname(socket.gethostname()) # Сравнить с действительным ip-адресом
-        self.INTERFACE_IP = interface_ip
+        Примечение: is_all_groups оставить лучше True, т.к. под Windows мы не можем забиндиться на адрес multicast-группы (https://habr.com/ru/articles/141021/)
+        '''
+
+        self._protocol_class = protocol_class
+        self._sock = None
+
+        if not buffer_size:
+            buffer_size = protocol_class.size()
+        
+        self.interface_ip = interface_ip
+        self.tx_address = (tx_ip, tx_port)
+        self.rx_address = (rx_ip, rx_port)
+        self.timeout = timeout
+        self.buffer_size = buffer_size     
 
         # Конфигурирование сокета
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        if self.IS_ALL_GROUPS:
-            self.sock.bind(('', rx_port))
+        self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        if is_all_groups:
+            self._sock.bind(('', rx_port))
         else:
-            self.sock.bind((rx_ip, rx_port))            
+            self._sock.bind((rx_ip, rx_port))            
         mreq = struct.pack("4s4s", socket.inet_aton(rx_ip), socket.inet_aton(interface_ip)) 
-        self.sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq) # Подключение к multicast-группе
-        self.sock.settimeout(timeout)
+        self._sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq) # Подключение к multicast-группе
+        self._sock.settimeout(timeout)
 
         # Вывод информации об объекте
-        print("###############################")
-        print("Создан объект ControllerUDP1:")
-        print(f"INTERFACE: {self.INTERFACE_IP}") 
-        print(f"TX_ADDRESS: {self.TX_ADDRESS}")
-        print(f"RX_ADDRESS: {self.RX_ADDRESS}")    
-        print("###############################")
+        print("##############################")
+        print("Создан объект TransportUDP:")
+        print(f"Interface: {self.interface_ip}") 
+        print(f"TX: {self.tx_address}")
+        print(f"RX: {self.rx_address}")    
+        print("##############################")
+        
 
-    def write(self, addr: int, value: int) -> bytes:
-        payload = self.pack_payload(addr, value)
-        self._send(payload)
-        return self._recv()
+    def write(self, address: int, value: int) -> ProtocolABC:
+        packet_request = self._protocol_class(address=address, value=value)
+        packet_response = self.write_packet(packet_request)
+        return packet_response
 
-    def read(self, addr: int) -> int:
-        payload = self.pack_payload(addr, 0)
-        self._send(payload)
-        raw = self._recv()
-        return self.unpack_payload(raw)[-1]
+    def read(self, address: int) -> ProtocolABC:
+        packet_request = self._protocol_class(address=address, value=0)
+        packet_response = self.write_packet(packet_request)
+        return packet_response
+
+    def write_packet(self, packet: ProtocolABC) -> ProtocolABC:
+        self.send(packet.to_bytes())
+        buffer_response = self.recv()
+        packet_response = self._protocol_class.from_bytes(buffer_response)
+        return packet_response
+
+    def send(self, buffer: bytes) -> int:
+        return self._sock.sendto(buffer, self.tx_address)
+
+    def recv(self) -> bytes:
+        buffer_response = self._sock.recv(self.buffer_size)
+        return buffer_response
+
+
+
+class ManagerControlConstants():
+    CLASS_FIELDS = ("_transport", "_config")
+
+    def __init__(self, transport: TransportABC, config: dict) -> None:
+        self._transport = transport
+        self._config = config
     
-    def _send(self, payload: bytes) -> int:
-        return self.sock.sendto(payload, self.TX_ADDRESS)
-
-    def _recv(self) -> bytes:
-        return self.sock.recv(self.BUFFER_SIZE)
-
-    def pack_payload(self, addr: int, value: int) -> bytes:
-        prefix = 0xccc0
-        return struct.pack(">2HQ", prefix, addr, value)  
-    
-    def unpack_payload(self, msg: bytes) -> tuple:
-        return struct.unpack(">2HQ", msg)
-
-
-class ControlConstantsManager:
-    CLASS_FIELDS = ("_controller", "_config_table")
-    def __init__(self, controller: ControllerABC, config_table: dict) -> None:
-        self._controller = controller
-        self._config_table = config_table
-        print("###############################")
+        print("##############################")
         print("ControlConstantsManager создан на основе конфигурационного файла.")
-        print("###############################")
+        print("##############################")
+
 
     def __getattr__(self, name):
-        if name in ControlConstantsManager.CLASS_FIELDS:
+        if name in ManagerControlConstants.CLASS_FIELDS:
             return object.__getattr__(self, name)
         
-        settings = self._config_table[name]
+        settings = self._config[name]
 
         is_visible = (settings["visible"] == "ENABLE")
         if not is_visible:
@@ -101,31 +161,30 @@ class ControlConstantsManager:
 
         addr = settings["read_hexcmd"]
         mask = 2**settings["workbits"]-1
-        value = self._controller.read(addr)
-        value &= mask
-        return value
+        response = self._transport.read(addr)
+        response.value &= mask
+        return response
 
     def __setattr__(self, name, value):
-        if name in ControlConstantsManager.CLASS_FIELDS:
+        if name in ManagerControlConstants.CLASS_FIELDS:
             return object.__setattr__(self, name, value)
 
-        settings = self._config_table[name]
+        settings = self._config[name]
 
         is_visible = (settings["visible"] == "ENABLE")
         is_writeable = (settings["write"] == "ENABLE")
         if not is_visible:
-            raise ValueError(f'Поле "{name}" не видимо.')
+            raise ValueError(f'Поле "{name}" невидимо.')
         if not is_writeable:
-            raise ValueError(f'Поле "{name}" не редактируемо.')
+            raise ValueError(f'Запись в поле "{name}" запрещена.')
         
         addr = settings["write_hexcmd"]
         mask = 2**settings["workbits"]-1
 
         if value != (value&mask):
-            raise ValueError(f'Недопустимое значение для поля "{name}" (addr=0x{addr:X}, value=0x{value:X})')
+            raise ValueError(f'Недопустимое значение для поля "{name}" ({addr=:#X}, {value=:#X})')
         value &= mask
-        self._controller.write(addr, value)
-
+        self._transport.write(addr, value)
 
 
 class utils:
@@ -160,60 +219,4 @@ class utils:
         config = utils.xml_to_dict(filepath)
         config = utils.replace_str_to_int(config)
         return config
-
-
-config_example = {
-    "raw_channel": 
-         {
-             "write_hexcmd": 0x404b,
-             "read_hexcmd": 0x004b,
-             "write": "ENABLE",
-             "visible": "ENABLE",
-             "workbits": 3
-         },
-    "speed_channel":
-         {
-             "write_hexcmd": 0x404a,
-             "read_hexcmd": 0x004a,
-             "write": "ENABLE",
-             "visible": "ENABLE",
-             "workbits": 3
-         },
-    "thresh_speed_rising":
-         {
-             "write_hexcmd": 0x4050,
-             "read_hexcmd": 0x0050,
-             "write": "ENABLE",
-             "visible": "ENABLE",
-             "workbits": 8
-         },
-    "switch_control":
-         {
-             "write_hexcmd": 0x404d,
-             "read_hexcmd": 0x004d,
-             "write": "ENABLE",
-             "visible": "ENABLE",
-             "workbits": 1
-         }
-        }
-
-
-
-
-
-if __name__=="__main__":
-    # Пример использования контроллера
-    controller = ControllerUDP1(interface_ip="192.168.1.15")
-    controller.write(0x404d, 0x0000)
-    print(f"{controller.read(0x004d)=}")
-
-    # Пример использования конфиргурационного файла XML
-    xml_filepath = r"D:\Code\PythonExamples\my_libs\jtagmgmt_memory (6).xml"
-    config_table = utils.import_config_from_xml(xml_filepath)
-
-    board = ControlConstantsManager(controller=controller, config_table=config_example)
-    board.switch_control = 0
-    print(f"{board.switch_control=}")
-
-
-
+    

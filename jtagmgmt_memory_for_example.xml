@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<device>
+    <protocol>
+        <param name="CC TEST">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Проверка работы Control Constants</description>
+            <write_hexcmd>0x4001</write_hexcmd>
+            <read_hexcmd>0x0001</read_hexcmd>
+            <workbits>64</workbits>
+            <valtype>HEX</valtype>
+        </param>
+        <param name="SOFT RESET">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>0xAA для сброса</description>
+            <write_hexcmd>0x4003</write_hexcmd>
+            <read_hexcmd>0x0003</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>HEX</valtype>
+        </param>
+        <param name="adc_data_1">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Значение на 1 АЦП</description>
+            <write_hexcmd>0x4100</write_hexcmd>
+            <read_hexcmd>0x0100</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="adc_data_2">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Значение на 2 АЦП</description>
+            <write_hexcmd>0x4101</write_hexcmd>
+            <read_hexcmd>0x0101</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="adc_data_3">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Значение на 3 АЦП</description>
+            <write_hexcmd>0x4102</write_hexcmd>
+            <read_hexcmd>0x0102</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="adc_data_4">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Значение на 4 АЦП</description>
+            <write_hexcmd>0x4103</write_hexcmd>
+            <read_hexcmd>0x0103</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="adc_data_5">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Значение на 5 АЦП</description>
+            <write_hexcmd>0x4104</write_hexcmd>
+            <read_hexcmd>0x0104</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="adc_data_6">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Значение на 6 АЦП</description>
+            <write_hexcmd>0x4105</write_hexcmd>
+            <read_hexcmd>0x0105</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="adc_data_7">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Значение на 7 АЦП</description>
+            <write_hexcmd>0x4106</write_hexcmd>
+            <read_hexcmd>0x0106</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="adc_data_8">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Значение на 8 АЦП</description>
+            <write_hexcmd>0x4107</write_hexcmd>
+            <read_hexcmd>0x0107</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="laser_en">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Вкл/Выкл лазера (0/1)	</description>
+            <write_hexcmd>0x4009</write_hexcmd>
+            <read_hexcmd>0x0009</read_hexcmd>
+            <workbits>1</workbits>
+            <valtype>HEX</valtype>
+        </param>
+        <param name="speed_channel">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Переключение канала, используемого для расчета скорости : 0 - канал 1, ... , 7 - канал 8</description>
+            <write_hexcmd>0x404a</write_hexcmd>
+            <read_hexcmd>0x004A</read_hexcmd>
+            <workbits>3</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="raw_channel">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Переключение канала выдачи сырых данных (data_switch = 1): 0 - канал 1, ... , 7 - канал 8</description>
+            <write_hexcmd>0x404b</write_hexcmd>
+            <read_hexcmd>0x004B</read_hexcmd>
+            <workbits>3</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="raw_decim">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Изменение коэффициента децимации сырых данных</description>
+            <write_hexcmd>0x404c</write_hexcmd>
+            <read_hexcmd>0x004C</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="switch_control">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Переключение режима работы смены канала выдачи сырых данных : 0 - auto, 1 - manual</description>
+            <write_hexcmd>0x404d</write_hexcmd>
+            <read_hexcmd>0x004D</read_hexcmd>
+            <workbits>1</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="thresh_speed_rising">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Порог для алгоритма расчета скорости</description>
+            <write_hexcmd>0x4050</write_hexcmd>
+            <read_hexcmd>0x0050</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="thresh_speed_falling">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Порог для алгоритма расчета скорости</description>
+            <write_hexcmd>0x4051</write_hexcmd>
+            <read_hexcmd>0x0051</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="thresh_gap_rising_0">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Порог для алгоритма рсчета зазора</description>
+            <write_hexcmd>0x4052</write_hexcmd>
+            <read_hexcmd>0x0052</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="thresh_gap_rising_1">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Порог для алгоритма рсчета зазора</description>
+            <write_hexcmd>0x4053</write_hexcmd>
+            <read_hexcmd>0x0053</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="thresh_gap_rising_2">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Порог для алгоритма рсчета зазора</description>
+            <write_hexcmd>0x4054</write_hexcmd>
+            <read_hexcmd>0x0054</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="thresh_gap_rising_3">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Порог для алгоритма рсчета зазора</description>
+            <write_hexcmd>0x4055</write_hexcmd>
+            <read_hexcmd>0x0055</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="thresh_gap_rising_4">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Порог для алгоритма рсчета зазора</description>
+            <write_hexcmd>0x4056</write_hexcmd>
+            <read_hexcmd>0x0056</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="thresh_gap_rising_5">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Порог для алгоритма рсчета зазора</description>
+            <write_hexcmd>0x4057</write_hexcmd>
+            <read_hexcmd>0x0057</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="thresh_gap_rising_6">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Порог для алгоритма рсчета зазора</description>
+            <write_hexcmd>0x4058</write_hexcmd>
+            <read_hexcmd>0x0058</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="thresh_gap_rising_7">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Порог для алгоритма рсчета зазора</description>
+            <write_hexcmd>0x4059</write_hexcmd>
+            <read_hexcmd>0x0059</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="thresh_gap_falling_0">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Порог для алгоритма рсчета зазора</description>
+            <write_hexcmd>0x405a</write_hexcmd>
+            <read_hexcmd>0x005A</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="thresh_gap_falling_1">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Порог для алгоритма рсчета зазора</description>
+            <write_hexcmd>0x405b</write_hexcmd>
+            <read_hexcmd>0x005B</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="thresh_gap_falling_2">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Порог для алгоритма рсчета зазора</description>
+            <write_hexcmd>0x405c</write_hexcmd>
+            <read_hexcmd>0x005C</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="thresh_gap_falling_3">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Порог для алгоритма рсчета зазора</description>
+            <write_hexcmd>0x405d</write_hexcmd>
+            <read_hexcmd>0x005D</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="thresh_gap_falling_4">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Порог для алгоритма рсчета зазора</description>
+            <write_hexcmd>0x405e</write_hexcmd>
+            <read_hexcmd>0x005E</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="thresh_gap_falling_5">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Порог для алгоритма рсчета зазора</description>
+            <write_hexcmd>0x405f</write_hexcmd>
+            <read_hexcmd>0x005F</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="thresh_gap_falling_6">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Порог для алгоритма рсчета зазора</description>
+            <write_hexcmd>0x4060</write_hexcmd>
+            <read_hexcmd>0x0060</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+        <param name="thresh_gap_falling_7">
+            <visible>ENABLE</visible>
+            <write>ENABLE</write>
+            <description>Порог для алгоритма рсчета зазор</description>
+            <write_hexcmd>0x4061</write_hexcmd>
+            <read_hexcmd>0x0061</read_hexcmd>
+            <workbits>8</workbits>
+            <valtype>UINT</valtype>
+        </param>
+    </protocol>
+</device>
