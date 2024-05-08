@@ -7,38 +7,51 @@ import xml.etree.ElementTree as ET
 
 class ProtocolABC(ABC):
     """Абстрактный базовый класс для объектов протокола."""
+    def __bytes__(self) -> bytes:
+        """Преобразовать объект протокола в байты."""
+        return self.to_bytes()
+
+    def to_bytes(self) -> bytes:
+        """Преобразовать объект протокола в байты с использованием указанного формата и кортежа значений."""
+        raise NotImplementedError(f'Абстрактный метод "{__name__}" не реализован!')
+
+    def from_bytes() -> None:
+        """Создать объект протокола из байтов с использованием указанного формата."""
+        raise NotImplementedError(f'Абстрактный метод "{__name__}" не реализован!')
+
+    def size() -> int:
+        """Получить размер объекта протокола в байтах."""
+        raise NotImplementedError(f'Абстрактный метод "{__name__}" не реализован!')
+
+class ProtocolBasedDC(ProtocolABC):
+    """Базовый класс для реализации, основанной на использовании dataclasses."""
     def __post_init__(self):
         self.to_bytes()
 
     def __bytes__(self):
-        """Преобразовать объект протокола в байты."""
         return self.to_bytes()
     
     def to_bytes(self):
-        """Преобразовать объект протокола в байты с использованием указанного формата и кортежа значений."""
         return struct.pack(self._format, *astuple(self))
     
     @classmethod
     def from_bytes(cls, binary: bytes):
-        """Создать объект протокола из байтов с использованием указанного формата."""
         fields = struct.unpack(cls._format, binary)
         return cls(*fields)
     
     @classmethod
     def size(self):
-        """Получить размер объекта протокола в байтах."""
         return struct.calcsize(self._format)
 
-
 @dataclass
-class ProtocolCC1(ProtocolABC):
+class ProtocolCC1(ProtocolBasedDC):
     header: int   = 0xCCC0  # uint16 | 2 байта
     address: int  = 0       # uint16 | 2 байта
     value: int    = 0       # uint64 | 8 байт
     _format: ClassVar[str] = ">"+"H"+"H"+"Q" 
 
 @dataclass
-class ProtocolCC2(ProtocolABC):
+class ProtocolCC2(ProtocolBasedDC):
     header: int    = 0xCC20 # uint16 | 2 байт
     dev_id: int    = 0      # uint16 | 2 байт
     timestamp: int = 0      # uint32 | 4 байта
@@ -46,7 +59,6 @@ class ProtocolCC2(ProtocolABC):
     address: int   = 0      # uint16 | 2 байта
     value: int     = 0      # uint64 | 8 байта
     _format: ClassVar[str] = ">"+"H"+"H"+"I"+"H"+"H"+"Q"
-
 
 class TransportABC(ABC):
     """Абстрактный базовый класс для объектов приемо-передачи пакетов"""
