@@ -4,6 +4,7 @@ from typing import ClassVar
 import socket
 import struct
 import xml.etree.ElementTree as ET
+import numpy as np
 
 class ProtocolABC(ABC):
     """Абстрактный базовый класс для объектов протокола."""
@@ -42,6 +43,50 @@ class ProtocolBasedDC(ProtocolABC):
     @classmethod
     def size(self):
         return struct.calcsize(self._format)
+    
+class ProtocolBasedNDA(ProtocolABC):
+    """Базовый класс для реализации, основанной на использовании numpy."""
+    def __init__(self, binary: bytes):        
+        self._original = binary
+        self._array = np.frombuffer(bytearray(binary), self._dtype)[0]
+    
+    def to_bytes(self):
+        return self._array.tobytes()
+    
+    @classmethod
+    def from_bytes(cls, binary: bytes):
+        return cls(binary)
+    
+    @classmethod
+    def size(self):
+        return self._dtype.itemsize
+    
+    def __getattr__(self, field):
+        if field.startswith("_"):
+            return object.__getattr__(self, field) 
+        if not field in self._dtype.names:
+            raise ValueError(f'Поле "{field}" отсутствует.')
+        return self._array[field]
+            
+    def __setattr__(self, field, value):
+        if field.startswith("_"):
+            return object.__setattr__(self, field, value)  
+        if not field in self._dtype.names:
+            raise ValueError(f'Поле "{field}" отсутствует.')
+        self._array[field] = value
+
+    def __str__(self):
+        s = ", ".join([f"{field}={self._array[field]}" for field in self._dtype.names])
+        return f'{self.__class__.__name__}({s})'
+    
+    def __repr__(self):
+        return self.__str__()
+
+    def get_recarray(self):
+        return self._array.view(np.recarray)
+
+    def __getitem__(self, name):
+        return self._array[name]
 
 @dataclass
 class ProtocolCC1(ProtocolBasedDC):
@@ -59,6 +104,18 @@ class ProtocolCC2(ProtocolBasedDC):
     address: int   = 0      # uint16 | 2 байта
     value: int     = 0      # uint64 | 8 байта
     _format: ClassVar[str] = ">"+"H"+"H"+"I"+"H"+"H"+"Q"
+
+class ProtocolGapSensorStreamRaw(ProtocolBasedNDA):
+    _dtype = np.dtype([
+        # Служебные данные
+        ('header', 'S2'),                   # Заголовок 0x0005                                      | 2 байта
+        ('name', 'S3'),                     # Тип пакета в ASCII, для обработанных данных 'raw'     | 3 байта
+        ('channel', '>u1'),                 # Номер канала                                          | 1 байт
+        ('timestamp', '>u8'),               # Время с момента включения датчика, мкс                | 8 байт
+        ('packet', '>u2'),                  # Счетчик пакетов                                       | 2 байта
+        # Полезные данные
+        ('counts', 'u1', (1408,))           # Первичные данные                                      | 1408 х 1 байт
+    ])
 
 class TransportABC(ABC):
     """Абстрактный базовый класс для объектов приемо-передачи пакетов"""
