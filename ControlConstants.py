@@ -37,6 +37,8 @@ class ProtocolBasedDC(ProtocolABC):
     
     @classmethod
     def from_bytes(cls, binary: bytes):
+        if len(binary) != cls.size():
+            raise ValueError("Недопустимый размер входных данных.")
         fields = struct.unpack(cls._format, binary)
         return cls(*fields)
     
@@ -46,9 +48,27 @@ class ProtocolBasedDC(ProtocolABC):
     
 class ProtocolBasedNDA(ProtocolABC):
     """Базовый класс для реализации, основанной на использовании numpy."""
-    def __init__(self, binary: bytes):        
-        self._original = binary
-        self._array = np.frombuffer(bytearray(binary), self._dtype)[0]
+    def __init__(self, *args, **kwargs):
+        '''
+        Принимает на вход:
+        1) ничего
+        2) bytes-объект по размеру пакета
+        3) последовательность "ключ=значение", например, value=1, packet=2
+        '''
+        if args:
+            if isinstance(args[0], (bytes, bytearray)):
+                binary = args[0]
+
+                if len(binary) != self.size():
+                    raise ValueError("Недопустимый размер входных данных.")
+                self._array = np.frombuffer(bytearray(binary), self._dtype)[0]
+            else:
+                raise ValueError("Некорректный аргумент.")
+        else:
+            kwargs = self._default_values | kwargs
+            self._array = np.zeros(1, self._dtype)[0]
+            for key, value in kwargs.items():
+                self._array[key] = value
     
     def to_bytes(self):
         return self._array.tobytes()
@@ -116,6 +136,7 @@ class ProtocolGapSensorStreamRaw(ProtocolBasedNDA):
         # Полезные данные
         ('counts', 'u1', (1408,))           # Первичные данные                                      | 1408 х 1 байт
     ])
+    _default_values: tuple = {"header": b"\x00\x05", "name": b"raw"}
 
 class TransportABC(ABC):
     """Абстрактный базовый класс для объектов приемо-передачи пакетов"""
@@ -130,16 +151,14 @@ class TransportABC(ABC):
         """Считать значение из указанного адреса."""
         pass
 
-
 class TransportUDP(TransportABC):
+    '''Класс транспорта, основанного на UDP-пакетах.'''
     def __init__(self, 
                  protocol_class: ProtocolABC,   # Класс протокола
                  interface_ip: str,             # IP-адрес интерфейса, через который происходит общение с ControlConstants
+                 tx_address: tuple,             # Кортеж с IP-адресом и портом для отправки команд
+                 rx_address: tuple,             # Кортеж с IP-адресом и портом для получения ответа
                  buffer_size: int = None,       # Максимальный размер сообщения (поля data в UDP-посылке); если не указан, берется из протокола
-                 tx_ip: str = "192.168.1.255",  # IP-адрес для отправки команд
-                 tx_port: int = 32766,          # Порт для отправки команд
-                 rx_ip: str = "239.1.2.3",      # IP-адрес для получения ответа
-                 rx_port: int = 32767,          # Порт для получения ответа                 
                  timeout: int = 5,              # Таймаут ожидания ответа [сек]
                  is_all_groups: bool = True     # 
     ) -> None:
@@ -150,36 +169,70 @@ class TransportUDP(TransportABC):
         '''
 
         self._protocol_class = protocol_class
-        self._sock = None
+        self._sock = self.createUDP(interface_ip, rx_address, timeout, is_all_groups) # Конфигурирование сокета
 
         if not buffer_size:
             buffer_size = protocol_class.size()
         
         self.interface_ip = interface_ip
-        self.tx_address = (tx_ip, tx_port)
-        self.rx_address = (rx_ip, rx_port)
+        self.tx_address = tx_address
+        self.rx_address = rx_address
         self.timeout = timeout
         self.buffer_size = buffer_size     
 
-        # Конфигурирование сокета
-        self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-        self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        if is_all_groups:
-            self._sock.bind(('', rx_port))
-        else:
-            self._sock.bind((rx_ip, rx_port))            
-        mreq = struct.pack("4s4s", socket.inet_aton(rx_ip), socket.inet_aton(interface_ip)) 
-        self._sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq) # Подключение к multicast-группе
-        self._sock.settimeout(timeout)
-
         # Вывод информации об объекте
-        print("##############################")
-        print("Создан объект TransportUDP:")
-        print(f"Interface: {self.interface_ip}") 
-        print(f"TX: {self.tx_address}")
-        print(f"RX: {self.rx_address}")    
-        print("##############################")
+        print(f"Создан объект: {self}")
+
+    @classmethod
+    def createUDP(self, interface_ip: int, multicast_address: tuple, timeout: int = 5, is_all_groups: bool = True):
+        '''Создание UDP-сокета, подключенного к multicast-группе.'''
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+        if is_all_groups:
+            sock.bind(('', multicast_address[1]))
+        else:
+            sock.bind(multicast_address)
+
+        mreq = struct.pack("4s4s", socket.inet_aton(multicast_address[0]), socket.inet_aton(interface_ip))
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq) # Подключение к multicast-группе
+        sock.settimeout(timeout)
+        return sock
         
+    def __repr__(self):
+        return f'{self.__class__.__name__}(protocol_class={self._protocol_class.__name__}, interface_ip="{self.interface_ip}", tx_address={self.tx_address}, rx_address={self.rx_address})'
+
+    def __str__(self):
+        return self.__repr__()
+
+    def write(self, *args, **kwargs):
+        packet = self._protocol_class(*args, **kwargs)
+        self.send(packet.to_bytes())
+
+    def read(self) -> ProtocolABC:
+        buffer_response = self.recv()
+        packet_response = self._protocol_class.from_bytes(buffer_response)
+        return packet_response
+
+    def send(self, buffer: bytes) -> int:
+        return self._sock.sendto(buffer, self.tx_address)
+
+    def recv(self) -> bytes:
+        buffer_response = self._sock.recv(self.buffer_size)
+        return buffer_response
+
+class TransportUDPforCC(TransportUDP):
+    '''Класс транспорта для протокола CC, основанного на UDP-пакетах.'''
+    def __init__(self,
+                 protocol_class: ProtocolABC,   # Класс протокола
+                 interface_ip: str,             # IP-адрес интерфейса, через который происходит общение с ControlConstants
+                 tx_address: tuple = ("192.168.1.255", 32766),  # Кортеж с IP-адресом и портом для отправки команд
+                 rx_address: tuple = ("239.1.2.3", 32767),      # Кортеж с IP-адресом и портом для получения ответа
+                 buffer_size: int = None,       # Максимальный размер сообщения (поля data в UDP-посылке); если не указан, берется из протокола
+                 timeout: int = 5,              # Таймаут ожидания ответа [сек]
+                 is_all_groups: bool = True     #
+    ) -> None:
+        super().__init__(protocol_class, interface_ip, tx_address, rx_address, buffer_size, timeout, is_all_groups)
 
     def write(self, address: int, value: int) -> ProtocolABC:
         packet_request = self._protocol_class(address=address, value=value)
@@ -196,14 +249,6 @@ class TransportUDP(TransportABC):
         buffer_response = self.recv()
         packet_response = self._protocol_class.from_bytes(buffer_response)
         return packet_response
-
-    def send(self, buffer: bytes) -> int:
-        return self._sock.sendto(buffer, self.tx_address)
-
-    def recv(self) -> bytes:
-        buffer_response = self._sock.recv(self.buffer_size)
-        return buffer_response
-
 
 
 class ManagerControlConstants():
