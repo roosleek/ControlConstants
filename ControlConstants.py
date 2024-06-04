@@ -5,6 +5,7 @@ import socket
 import struct
 import xml.etree.ElementTree as ET
 import numpy as np
+import select
 
 class ProtocolABC(ABC):
     """Абстрактный базовый класс для объектов протокола."""
@@ -190,7 +191,7 @@ class TransportUDP(TransportABC):
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
         if is_all_groups:
-            sock.bind(('', multicast_address[1]))
+            sock.bind((interface_ip, multicast_address[1]))
         else:
             sock.bind(multicast_address)
 
@@ -220,6 +221,13 @@ class TransportUDP(TransportABC):
     def recv(self) -> bytes:
         buffer_response = self._sock.recv(self.buffer_size)
         return buffer_response
+    
+    def flush(self) -> int:
+        counter = 0
+        while select.select([self._sock], [], [], 0)[0]:
+            self.recv()
+            counter += 1
+        return counter        
 
 class TransportUDPforCC(TransportUDP):
     '''Класс транспорта для протокола CC, основанного на UDP-пакетах.'''
@@ -235,11 +243,13 @@ class TransportUDPforCC(TransportUDP):
         super().__init__(protocol_class, interface_ip, tx_address, rx_address, buffer_size, timeout, is_all_groups)
 
     def write(self, address: int, value: int) -> ProtocolABC:
+        self.flush()
         packet_request = self._protocol_class(address=address, value=value)
         packet_response = self.write_packet(packet_request)
         return packet_response
 
     def read(self, address: int) -> ProtocolABC:
+        self.flush()
         packet_request = self._protocol_class(address=address, value=0)
         packet_response = self.write_packet(packet_request)
         return packet_response
@@ -252,8 +262,6 @@ class TransportUDPforCC(TransportUDP):
 
 
 class ManagerControlConstants():
-    CLASS_FIELDS = ("_transport", "_config")
-
     def __init__(self, transport: TransportABC, config: dict) -> None:
         self._transport = transport
         self._config = config
@@ -264,7 +272,7 @@ class ManagerControlConstants():
 
 
     def __getattr__(self, name):
-        if name in ManagerControlConstants.CLASS_FIELDS:
+        if name.startswith("_"):
             return object.__getattr__(self, name)
         
         settings = self._config[name]
@@ -280,7 +288,7 @@ class ManagerControlConstants():
         return response
 
     def __setattr__(self, name, value):
-        if name in ManagerControlConstants.CLASS_FIELDS:
+        if name.startswith("_"):
             return object.__setattr__(self, name, value)
 
         settings = self._config[name]
