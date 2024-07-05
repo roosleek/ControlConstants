@@ -284,7 +284,10 @@ class ManagerControlConstants():
         addr = settings["read_hexcmd"]
         mask = 2**settings["workbits"]-1
         response = self._transport.read(addr)
-        response.value &= mask
+
+        if isinstance(response.value, int):
+            response.value &= mask
+            
         return response
 
     def __setattr__(self, name, value):
@@ -303,9 +306,11 @@ class ManagerControlConstants():
         addr = settings["write_hexcmd"]
         mask = 2**settings["workbits"]-1
 
-        if value != (value&mask):
-            raise ValueError(f'Недопустимое значение для поля "{name}" ({addr=:#X}, {value=:#X})')
-        value &= mask
+        if isinstance(value, int):
+            if value != (value&mask):
+                raise ValueError(f'Недопустимое значение для поля "{name}" ({addr=:#X}, {value=:#X})')
+            value &= mask
+
         self._transport.write(addr, value)
 
 
