@@ -4,6 +4,12 @@
 
 ## Установка
 
+Напрямую: 
+```bash
+pip install git+https://github.com/roosleek/ControlConstants
+```
+
+Используя исходники:
 ```bash
 pip install .
 ```
