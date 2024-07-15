@@ -238,27 +238,36 @@ class TransportUDPforCC(TransportUDP):
                  rx_address: tuple = ("239.1.2.3", 32767),      # Кортеж с IP-адресом и портом для получения ответа
                  buffer_size: int = None,       # Максимальный размер сообщения (поля data в UDP-посылке); если не указан, берется из протокола
                  timeout: int = 5,              # Таймаут ожидания ответа [сек]
-                 is_all_groups: bool = True     #
+                 is_all_groups: bool = True,    #
+                 wr_ack: bool = True,           # Ожидание пакета-подтверждения в процессе записи значения
     ) -> None:
         super().__init__(protocol_class, interface_ip, tx_address, rx_address, buffer_size, timeout, is_all_groups)
+        self.wr_ack = wr_ack
 
     def write(self, address: int, value: int) -> ProtocolABC:
         self.flush()
         packet_request = self._protocol_class(address=address, value=value)
-        packet_response = self.write_packet(packet_request)
+        packet_response = self.write_packet(packet_request, ack=self.wr_ack)
         return packet_response
 
     def read(self, address: int) -> ProtocolABC:
         self.flush()
         packet_request = self._protocol_class(address=address, value=0)
-        packet_response = self.write_packet(packet_request)
+        packet_response = self.write_packet(packet_request, ack=True)
         return packet_response
 
-    def write_packet(self, packet: ProtocolABC) -> ProtocolABC:
-        self.send(packet.to_bytes())
-        buffer_response = self.recv()
-        packet_response = self._protocol_class.from_bytes(buffer_response)
-        return packet_response
+    def write_packet(self, packet_request: ProtocolABC, ack: bool) -> ProtocolABC:
+        '''
+        1) packet_request: ProtocolABC - пакет, который нужно отправить
+        2) ack: bool - ожидание и возврат ответного пакета; если ack=True ожидается и возвращается ответ, если ack=False возвращается пакет, который был отправлен
+        '''
+        self.send(packet_request.to_bytes())
+        if ack:
+            buffer_response = self.recv()
+            packet_response = self._protocol_class.from_bytes(buffer_response)
+            return packet_response
+        else:
+            return packet_request
 
 
 class ManagerControlConstants():
@@ -342,8 +351,17 @@ class utils:
         return dictionary
     
     @staticmethod
+    def fill_visible(dictionary):
+        # Дополнение конфигурационного файла полем visible=ENABLED, если его нет
+        for field, _ in dictionary.items():
+            if not ("visible" in  dictionary[field]):
+                dictionary[field]["visible"] = "ENABLE"
+        return dictionary
+    
+    @staticmethod
     def import_config_from_xml(filepath):
         config = utils.xml_to_dict(filepath)
         config = utils.replace_str_to_int(config)
+        config = utils.fill_visible(config)
         return config
     
